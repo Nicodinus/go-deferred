@@ -4,6 +4,18 @@ type Deferred[T any] struct {
 	promise Promise[T]
 }
 
+func (d *Deferred[T]) Go(handler func() (*T, error)) *Promise[T] {
+	go func() {
+		result, err := handler()
+		if err != nil {
+			d.Reject(err)
+		} else {
+			d.Resolve(result)
+		}
+	}()
+	return d.Promise()
+}
+
 func (d *Deferred[T]) IsResolved() bool {
 	return d.promise.IsResolved()
 }
