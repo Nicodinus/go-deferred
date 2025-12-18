@@ -34,3 +34,27 @@ func TestDeferredGo(t *testing.T) {
 	require.ErrorIs(t, err, testErr)
 	require.Nil(t, result2)
 }
+
+func TestEmptyDeferredGo(t *testing.T) {
+	// Контекст теста с таймаутом
+	ctx, cancelFn := context.WithTimeout(context.Background(), time.Duration(5)*time.Second)
+	defer cancelFn()
+
+	//
+	promise := deferred.GoEmpty(func() error {
+		return nil
+	})
+
+	err := promise.Wait(ctx)
+	require.NoError(t, err)
+	require.True(t, promise.IsResolved())
+
+	testErr := errors.New("test error")
+	promise2 := deferred.GoEmpty(func() error {
+		return testErr
+	})
+
+	err = promise2.Wait(ctx)
+	require.ErrorIs(t, err, testErr)
+	require.True(t, promise.IsResolved())
+}

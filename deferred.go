@@ -1,7 +1,7 @@
 package deferred
 
 type Deferred[T any] struct {
-	promise Promise[T]
+	promise *Promise[T]
 }
 
 func (d *Deferred[T]) Go(handler func() (*T, error)) *Promise[T] {
@@ -33,5 +33,5 @@ func (d *Deferred[T]) Cancel() error {
 }
 
 func (d *Deferred[T]) Promise() *Promise[T] {
-	return &d.promise
+	return d.promise
 }
