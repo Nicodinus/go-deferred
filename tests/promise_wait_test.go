@@ -160,7 +160,7 @@ func TestWaitContextTimeoutBeforePromiseResolve(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	err := d.Resolve(&testData)
-	require.NoError(t, err)
+	require.ErrorIs(t, err, deferred.ErrPromiseResolved)
 
 	result := <-testCh
 	require.ErrorIs(t, context.DeadlineExceeded, result.err)
@@ -211,7 +211,7 @@ func TestWaitContextCancelBeforePromiseResolve(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	err := d.Resolve(&testData)
-	require.NoError(t, err)
+	require.ErrorIs(t, err, deferred.ErrPromiseResolved)
 
 	result := <-testCh
 	require.ErrorIs(t, context.Canceled, result.err)
