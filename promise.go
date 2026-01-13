@@ -67,6 +67,7 @@ func (p *Promise[T]) Wait(ctx context.Context) (*T, error) {
 
 	select {
 	case <-ctx.Done():
+		p.resolve(nil, ctx.Err())
 		return nil, ctx.Err()
 	case <-ch:
 		p.m.RLock()

@@ -65,6 +65,7 @@ func (p *EmptyPromise) Wait(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
+		p.resolve(ctx.Err())
 		return ctx.Err()
 	case <-ch:
 		p.m.RLock()
