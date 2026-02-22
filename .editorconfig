@@ -1,0 +1,21 @@
+# See https://editorconfig.org/#file-format-details
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 2
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Makefiles depend on tab characters.
+[{Makefile, *.mk}]
+indent_style = tab
+tab_width = 4
+indent_size = 4
+
+# Tab indentation is the default for Go.
+[*.go]
+indent_style = tab
+tab_width = 4
+indent_size = 4
