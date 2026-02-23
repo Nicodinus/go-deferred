@@ -28,6 +28,14 @@ type testChanHelperResult1[T any] struct {
 	err error
 }
 
+type testStringer struct {
+	val string
+}
+
+func (s *testStringer) String() string {
+	return s.val
+}
+
 func CreateDeferredAndResolveAfterWait[T any](t *testing.T, val T, ctx context.Context) {
 	t.Helper()
 
@@ -507,46 +515,65 @@ func TestDeferred(t *testing.T) {
 		defer testCancelFn()
 
 		// case 1
-		promise, cancelFn := deferred.Go(func(ctx context.Context) (net.Conn, error) {
-			var conn net.Conn
-			return conn, nil
-		})
-		defer cancelFn()
+		{
+			promise, cancelFn := deferred.Go(func(ctx context.Context) (net.Conn, error) {
+				var conn net.Conn
+				return conn, nil
+			})
+			defer cancelFn()
 
-		result, err := promise.Wait(testCtx)
-		require.NoError(t, err)
-		require.Nil(t, result)
+			result, err := promise.Wait(testCtx)
+			require.NoError(t, err)
+			require.Nil(t, result)
+		}
 
 		// case 2
-		promise, cancelFn = deferred.Go(func(ctx context.Context) (net.Conn, error) {
-			return nil, nil
-		})
-		defer cancelFn()
+		{
+			promise, cancelFn := deferred.Go(func(ctx context.Context) (net.Conn, error) {
+				return nil, nil
+			})
+			defer cancelFn()
 
-		result, err = promise.Wait(testCtx)
-		require.NoError(t, err)
-		require.Nil(t, result)
+			result, err := promise.Wait(testCtx)
+			require.NoError(t, err)
+			require.Nil(t, result)
+		}
 
 		// case 3
-		promise, cancelFn = deferred.Go(func(ctx context.Context) (net.Conn, error) {
-			var conn net.Conn
-			return conn, fmt.Errorf("test error")
-		})
-		defer cancelFn()
+		{
+			promise, cancelFn := deferred.Go(func(ctx context.Context) (net.Conn, error) {
+				var conn net.Conn
+				return conn, fmt.Errorf("test error")
+			})
+			defer cancelFn()
 
-		result, err = promise.Wait(testCtx)
-		require.EqualError(t, err, "test error")
-		require.Nil(t, result)
+			result, err := promise.Wait(testCtx)
+			require.EqualError(t, err, "test error")
+			require.Nil(t, result)
+		}
 
 		// case 4
-		promise, cancelFn = deferred.Go(func(ctx context.Context) (net.Conn, error) {
-			return nil, fmt.Errorf("test error")
-		})
-		defer cancelFn()
+		{
+			promise, cancelFn := deferred.Go(func(ctx context.Context) (net.Conn, error) {
+				return nil, fmt.Errorf("test error")
+			})
+			defer cancelFn()
 
-		result, err = promise.Wait(testCtx)
-		require.EqualError(t, err, "test error")
-		require.Nil(t, result)
+			result, err := promise.Wait(testCtx)
+			require.EqualError(t, err, "test error")
+			require.Nil(t, result)
+		}
 
+		// case 5
+		{
+			promise, cancelFn := deferred.Go(func(ctx context.Context) (fmt.Stringer, error) {
+				return &testStringer{val: "test 123"}, fmt.Errorf("test error")
+			})
+			defer cancelFn()
+
+			result, err := promise.Wait(testCtx)
+			require.EqualError(t, err, "test error")
+			require.Nil(t, result)
+		}
 	})
 }
