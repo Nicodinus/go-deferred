@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"fmt"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -58,7 +59,9 @@ func CreateDeferredAndResolveAfterWait[T any](t *testing.T, val T, ctx context.C
 		resolveChan <- testChanHelperResult1[T]{}
 	}()
 
+	require.False(t, d.Promise().IsResolved())
 	result, err := d.Promise().Wait(ctx)
+	require.True(t, d.Promise().IsResolved())
 	require.NoError(t, err)
 	require.EqualValues(t, val, result)
 	for range 4 {
@@ -106,7 +109,9 @@ func CreateResolvedDeferred[T any](t *testing.T, val T, ctx context.Context) {
 	resolveChan <- testChanHelperResult1[T]{id: testChanHelperResult1ResolveGoroutine, err: d.Resolve(val)}
 	wg.Done()
 
+	require.True(t, d.Promise().IsResolved())
 	result, err := d.Promise().Wait(ctx)
+	require.True(t, d.Promise().IsResolved())
 	require.NoError(t, err)
 	require.EqualValues(t, val, result)
 	for range 4 {
@@ -157,7 +162,9 @@ func CreateDeferredAndRejectAfterWait[T any](t *testing.T, val T, rejectVal erro
 	}()
 
 	var zeroVal T
+	require.False(t, d.Promise().IsResolved())
 	result, err := d.Promise().Wait(ctx)
+	require.True(t, d.Promise().IsResolved())
 	require.ErrorIs(t, err, rejectVal)
 	require.EqualValues(t, zeroVal, result)
 	for range 4 {
@@ -206,7 +213,9 @@ func CreateRejectedDeferred[T any](t *testing.T, val T, rejectVal error, ctx con
 	wg.Done()
 
 	var zeroVal T
+	require.True(t, d.Promise().IsResolved())
 	result, err := d.Promise().Wait(ctx)
+	require.True(t, d.Promise().IsResolved())
 	require.ErrorIs(t, err, rejectVal)
 	require.EqualValues(t, zeroVal, result)
 	for range 4 {
@@ -489,5 +498,55 @@ func TestDeferred(t *testing.T) {
 		CreateResolvedDeferredAndResolveAfterWait(t, testData, testCtx)
 		CreateRejectedDeferredAndResolveAfterWait(t, testData, testError, testCtx)
 		CreateDeferredGo(t, testData, testError, testCtx)
+	})
+
+	t.Run("Edge cases", func(t *testing.T) {
+		t.Parallel()
+
+		testCtx, testCancelFn := context.WithTimeout(context.Background(), time.Duration(5)*time.Second)
+		defer testCancelFn()
+
+		// case 1
+		promise, cancelFn := deferred.Go(func(ctx context.Context) (net.Conn, error) {
+			var conn net.Conn
+			return conn, nil
+		})
+		defer cancelFn()
+
+		result, err := promise.Wait(testCtx)
+		require.NoError(t, err)
+		require.Nil(t, result)
+
+		// case 2
+		promise, cancelFn = deferred.Go(func(ctx context.Context) (net.Conn, error) {
+			return nil, nil
+		})
+		defer cancelFn()
+
+		result, err = promise.Wait(testCtx)
+		require.NoError(t, err)
+		require.Nil(t, result)
+
+		// case 3
+		promise, cancelFn = deferred.Go(func(ctx context.Context) (net.Conn, error) {
+			var conn net.Conn
+			return conn, fmt.Errorf("test error")
+		})
+		defer cancelFn()
+
+		result, err = promise.Wait(testCtx)
+		require.EqualError(t, err, "test error")
+		require.Nil(t, result)
+
+		// case 4
+		promise, cancelFn = deferred.Go(func(ctx context.Context) (net.Conn, error) {
+			return nil, fmt.Errorf("test error")
+		})
+		defer cancelFn()
+
+		result, err = promise.Wait(testCtx)
+		require.EqualError(t, err, "test error")
+		require.Nil(t, result)
+
 	})
 }
