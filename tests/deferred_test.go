@@ -12,30 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type testChanHelperResult1Id int
-
-const (
-	testChanHelperResult1Undefined testChanHelperResult1Id = iota
-	testChanHelperResult1ResolveGoroutine
-	testChanHelperResult1PromiseOnSuccess
-	testChanHelperResult1PromiseOnFail
-	testChanHelperResult1PromiseOnResolve
-)
-
-type testChanHelperResult1[T any] struct {
-	id  testChanHelperResult1Id
-	val T
-	err error
-}
-
-type testStringer struct {
-	val string
-}
-
-func (s *testStringer) String() string {
-	return s.val
-}
-
 func CreateDeferredAndResolveAfterWait[T any](t *testing.T, val T, ctx context.Context) {
 	t.Helper()
 
@@ -395,6 +371,8 @@ func CreateDeferredGo[T any](t *testing.T, val T, rejectVal error, ctx context.C
 }
 
 func TestDeferred(t *testing.T) {
+	t.Parallel()
+
 	type testStruct1 struct {
 		field1 string
 		field2 int

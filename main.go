@@ -9,7 +9,7 @@ func Go[T any](handler func(ctx context.Context) (T, error)) (Promise[T], contex
 	return d.Go(handler)
 }
 
-// func GoEmpty(handler func() error) *EmptyPromise {
-// 	d := CreateEmpty()
-// 	return d.Go(handler)
-// }
+func GoEmpty(handler func(ctx context.Context) error) (EmptyPromise, context.CancelFunc) {
+	d := CreateEmptyDeferred()
+	return d.Go(handler)
+}
