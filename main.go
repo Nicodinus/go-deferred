@@ -13,3 +13,15 @@ func GoEmpty(handler func(ctx context.Context) error) (EmptyPromise, context.Can
 	d := CreateEmptyDeferred()
 	return d.Go(handler)
 }
+
+func CreateResolvedPromise[T any](val T, err error) Promise[T] {
+	p := createSimplePromise[T]()
+	p.resolve(val, err)
+	return p
+}
+
+func CreateResolvedEmptyPromise(err error) EmptyPromise {
+	p := createSimpleEmptyPromise()
+	p.resolve(err)
+	return p
+}
