@@ -13,8 +13,7 @@ type simplePromise[T any] struct {
 	handlers   []func(T, error)
 	isResolved atomic.Bool
 
-	m            sync.RWMutex
-	resolveMutex sync.RWMutex
+	cond *sync.Cond
 
 	zeroVal T
 }
@@ -24,24 +23,11 @@ func (p *simplePromise[T]) IsResolved() bool {
 }
 
 func (p *simplePromise[T]) OnResolve(h func(val T, err error)) {
+	p.cond.L.Lock()
+	defer p.cond.L.Unlock()
+
 	if p.IsResolved() {
-		p.m.RLock()
-		defer p.m.RUnlock()
-		// if p.err != nil {
-		// 	var zeroVal T
-		// 	go h(zeroVal, p.err)
-		// } else {
-		// 	go h(p.val, p.err)
-		// }
 		go h(p.val, p.err)
-		return
-	}
-
-	p.m.Lock()
-	defer p.m.Unlock()
-
-	if p.IsResolved() {
-		p.OnResolve(h)
 		return
 	}
 
@@ -67,15 +53,10 @@ func (p *simplePromise[T]) OnFail(h func(err error)) {
 }
 
 func (p *simplePromise[T]) Wait(ctx context.Context) (T, error) {
+	p.cond.L.Lock()
+	defer p.cond.L.Unlock()
+
 	if p.IsResolved() {
-		p.m.RLock()
-		defer p.m.RUnlock()
-
-		// if p.err != nil {
-		// 	var zeroVal T
-		// 	return zeroVal, p.err
-		// }
-
 		return p.val, p.err
 	}
 
@@ -89,11 +70,7 @@ func (p *simplePromise[T]) Wait(ctx context.Context) (T, error) {
 		}
 	}()
 
-	p.resolveMutex.RLock()
-	defer p.resolveMutex.RUnlock()
-
-	p.m.RLock()
-	defer p.m.RUnlock()
+	p.cond.Wait()
 
 	return p.val, p.err
 }
@@ -110,20 +87,19 @@ func (p *simplePromise[T]) resolve(val T, err error) error {
 	if p.IsResolved() {
 		return ErrPromiseResolved
 	}
-	p.m.Lock()
-	defer p.m.Unlock()
 
-	if p.IsResolved() {
-		return ErrPromiseResolved
-	}
+	p.cond.L.Lock()
+	defer func() {
+		p.cond.L.Unlock()
+		p.cond.Broadcast()
+	}()
 	p.isResolved.Store(true)
 
 	if err == nil {
 		p.val = val
+	} else {
+		p.err = err
 	}
-	p.err = err
-
-	defer p.resolveMutex.Unlock()
 
 	handlers := p.handlers
 	p.handlers = nil
@@ -138,7 +114,7 @@ func (p *simplePromise[T]) resolve(val T, err error) error {
 }
 
 func createSimplePromise[T any]() *simplePromise[T] {
-	p := simplePromise[T]{}
-	p.resolveMutex.Lock()
-	return &p
+	return &simplePromise[T]{
+		cond: sync.NewCond(&sync.Mutex{}),
+	}
 }
