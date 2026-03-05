@@ -12,8 +12,7 @@ type simpleEmptyPromise struct {
 	handlers   []func(error)
 	isResolved atomic.Bool
 
-	m            sync.RWMutex
-	resolveMutex sync.RWMutex
+	cond *sync.Cond
 }
 
 func (p *simpleEmptyPromise) IsResolved() bool {
@@ -21,18 +20,11 @@ func (p *simpleEmptyPromise) IsResolved() bool {
 }
 
 func (p *simpleEmptyPromise) OnResolve(h func(err error)) {
+	p.cond.L.Lock()
+	defer p.cond.L.Unlock()
+
 	if p.IsResolved() {
-		p.m.RLock()
-		defer p.m.RUnlock()
 		go h(p.err)
-		return
-	}
-
-	p.m.Lock()
-	defer p.m.Unlock()
-
-	if p.IsResolved() {
-		p.OnResolve(h)
 		return
 	}
 
@@ -58,10 +50,10 @@ func (p *simpleEmptyPromise) OnFail(h func(err error)) {
 }
 
 func (p *simpleEmptyPromise) Wait(ctx context.Context) error {
-	if p.IsResolved() {
-		p.m.RLock()
-		defer p.m.RUnlock()
+	p.cond.L.Lock()
+	defer p.cond.L.Unlock()
 
+	if p.IsResolved() {
 		return p.err
 	}
 
@@ -75,11 +67,7 @@ func (p *simpleEmptyPromise) Wait(ctx context.Context) error {
 		}
 	}()
 
-	p.resolveMutex.RLock()
-	defer p.resolveMutex.RUnlock()
-
-	p.m.RLock()
-	defer p.m.RUnlock()
+	p.cond.Wait()
 
 	return p.err
 }
@@ -96,17 +84,17 @@ func (p *simpleEmptyPromise) resolve(err error) error {
 	if p.IsResolved() {
 		return ErrPromiseResolved
 	}
-	p.m.Lock()
-	defer p.m.Unlock()
 
-	if p.IsResolved() {
-		return ErrPromiseResolved
-	}
+	p.cond.L.Lock()
+	defer func() {
+		p.cond.L.Unlock()
+		p.cond.Broadcast()
+	}()
 	p.isResolved.Store(true)
 
-	p.err = err
-
-	defer p.resolveMutex.Unlock()
+	if err != nil {
+		p.err = err
+	}
 
 	handlers := p.handlers
 	p.handlers = nil
@@ -121,7 +109,7 @@ func (p *simpleEmptyPromise) resolve(err error) error {
 }
 
 func createSimpleEmptyPromise() *simpleEmptyPromise {
-	p := simpleEmptyPromise{}
-	p.resolveMutex.Lock()
-	return &p
+	return &simpleEmptyPromise{
+		cond: sync.NewCond(&sync.Mutex{}),
+	}
 }
