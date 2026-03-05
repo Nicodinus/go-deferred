@@ -89,6 +89,10 @@ func (p *simplePromise[T]) resolve(val T, err error) error {
 	}
 
 	p.cond.L.Lock()
+	if p.IsResolved() {
+		p.cond.L.Unlock()
+		return ErrPromiseResolved
+	}
 	defer func() {
 		p.isResolved.Store(true)
 		p.cond.L.Unlock()

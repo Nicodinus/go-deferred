@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -554,4 +555,31 @@ func TestDeferred(t *testing.T) {
 			require.Nil(t, result)
 		}
 	})
+}
+
+func TestDoubleResolve(t *testing.T) {
+	testError := fmt.Errorf("test error")
+
+	testCtx, testCancelFn := context.WithTimeout(context.Background(), time.Duration(5)*time.Second)
+	defer testCancelFn()
+
+	var counter atomic.Uint64
+
+	d := deferred.CreateEmptyDeferred()
+	p := d.Promise()
+	p.OnResolve(func(err error) {
+		counter.Add(1)
+	})
+
+	for range 1000 {
+		if RandRange(0, 100) >= 50 {
+			go d.Reject(testError)
+		} else {
+			go d.Resolve()
+		}
+	}
+
+	p.Wait(testCtx)
+	time.Sleep(1000 * time.Millisecond)
+	require.EqualValues(t, 1, counter.Load())
 }

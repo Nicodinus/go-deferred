@@ -86,6 +86,10 @@ func (p *simpleEmptyPromise) resolve(err error) error {
 	}
 
 	p.cond.L.Lock()
+	if p.IsResolved() {
+		p.cond.L.Unlock()
+		return ErrPromiseResolved
+	}
 	defer func() {
 		p.isResolved.Store(true)
 		p.cond.L.Unlock()
