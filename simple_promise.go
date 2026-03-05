@@ -90,10 +90,10 @@ func (p *simplePromise[T]) resolve(val T, err error) error {
 
 	p.cond.L.Lock()
 	defer func() {
+		p.isResolved.Store(true)
 		p.cond.L.Unlock()
 		p.cond.Broadcast()
 	}()
-	p.isResolved.Store(true)
 
 	if err == nil {
 		p.val = val
